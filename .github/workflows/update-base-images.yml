@@ -1,0 +1,109 @@
+name: Update Base Images
+
+on:
+  workflow_call:
+    inputs:
+      short_sha:
+        required: true
+        type: string
+      type:
+        required: true
+        type: string
+      base_repo:
+        required: true
+        type: string
+      base_branch:
+        required: true
+        type: string
+    secrets:
+      PAT:
+        required: true
+
+env:
+  CI_BRANCH: ci
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+jobs:
+  update-branch:
+    name: Update Images
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.branch.outputs.name }}
+      old-version: ${{ steps.update-images.outputs.old-version }}
+
+    steps:
+    - name: Get target file name
+      id: target_files
+      run: |
+        if [ ${{ inputs.type }} = base ]
+        then
+          echo "::set-output name=name::buildah.sh"
+        elif [ ${{ inputs.type }} = config ]
+        then
+          echo "::set-output name=name::buildah-config.sh"
+        else
+          echo "Unknown update type: ${{ inputs.type }}"
+          exit 1
+        fi
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ env.DEFAULT_BRANCH }}
+
+    - name: Create update branch
+      id: branch
+      run: |
+        # Generate unique branch name using the commit sha + timestamp.
+        BRANCH_NAME="${{ env.CI_BRANCH }}-${{ inputs.short_sha }}-$(date +%s)"
+        echo "::set-output name=name::${BRANCH_NAME}"
+        git checkout -B ${BRANCH_NAME}
+
+    - name: Push update branch
+      uses: ad-m/github-push-action@v0.6.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ steps.branch.outputs.name }}
+
+    - name: Update Base Images
+      id: update-images
+      uses: portworx/action-update-base-images@v1.1
+      with:
+        to-version: ${{ inputs.short_sha }}
+        branch: ${{ steps.branch.outputs.name }}
+        filename: ${{ steps.target_files.outputs.name }}
+
+  
+  pull-request:
+    name: Create PR
+    needs: [update-branch]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.3.4
+      with:
+        ref: ${{ needs.update-branch.outputs.name }}
+
+    - name: Generate release changelog
+      id: changelog
+      uses: portworx/action-build-changelog@v1
+      with:
+        repository: ${{ inputs.base_repo }}
+        branch: ${{ inputs.base_branch }}
+        from-version: ${{ needs.update-branch.outputs.old-version }}
+        to-version: ${{ inputs.short_sha }}
+        token: ${{ secrets.PAT }}
+
+    - name: Create pull request
+      id: pull-request
+      uses: repo-sync/pull-request@v2.6.2
+      with:
+        source_branch: ${{ needs.update-branch.outputs.name }}
+        destination_branch: ${{ env.DEFAULT_BRANCH }}
+        pr_title: Upgrade ${{ inputs.type }} images from ${{ needs.update-branch.outputs.old-version }} to ${{ inputs.short_sha }}
+        pr_body: |
+          Upgrade \`${{ inputs.type }}\` images from \`${{ needs.update-branch.outputs.old-version }}\` to \`${{ inputs.short_sha }}\`. Changelog:
+          
+          ${{ steps.changelog.outputs.changelog }}
+        pr_label: ci
+        github_token: ${{ secrets.GITHUB_TOKEN }}
