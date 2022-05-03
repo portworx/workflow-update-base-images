@@ -15,9 +15,6 @@ on:
       base_branch:
         required: true
         type: string
-    secrets:
-      PAT:
-        required: true
 
 env:
   CI_BRANCH: ci
@@ -86,9 +83,6 @@ jobs:
         ref: v1
         path: ./action-build-changelog
 
-    - run: |
-        ls -la ./action-build-changelog
-
     - name: Generate release changelog
       id: changelog
       uses: ./action-build-changelog
@@ -97,7 +91,7 @@ jobs:
         branch: ${{ inputs.base_branch }}
         from-version: ${{ needs.update-branch.outputs.old-version }}
         to-version: ${{ inputs.short_sha }}
-        token: ${{ secrets.PAT }}
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Checkout
       uses: actions/checkout@v3
