@@ -50,7 +50,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ env.DEFAULT_BRANCH }}
-        token: ${{ secrets.PAT }}
 
     - name: Create update branch
       id: branch
@@ -80,20 +79,27 @@ jobs:
     needs: [update-branch]
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2.3.4
-      with:
-        ref: ${{ needs.update-branch.outputs.name }}
+
+    - uses: actions/checkout@v3
+      with: 
+        repository: portworx/action-build-changelog
+        ref: v1
+        path: action-build-changelog
 
     - name: Generate release changelog
       id: changelog
-      uses: portworx/action-build-changelog@v1
+      uses: action-build-changelog/action.yml
       with:
         repository: ${{ inputs.base_repo }}
         branch: ${{ inputs.base_branch }}
         from-version: ${{ needs.update-branch.outputs.old-version }}
         to-version: ${{ inputs.short_sha }}
         token: ${{ secrets.PAT }}
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ needs.update-branch.outputs.name }}
 
     - name: Create pull request
       id: pull-request
