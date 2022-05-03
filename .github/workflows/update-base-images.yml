@@ -84,11 +84,14 @@ jobs:
       with: 
         repository: portworx/action-build-changelog
         ref: v1
-        path: /action-build-changelog
+        path: ./action-build-changelog
+
+    - run: |
+        ls -la ./action-build-changelog
 
     - name: Generate release changelog
       id: changelog
-      uses: /action-build-changelog/action.yml
+      uses: ./action-build-changelog/action.yml
       with:
         repository: ${{ inputs.base_repo }}
         branch: ${{ inputs.base_branch }}
