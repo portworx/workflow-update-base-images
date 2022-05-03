@@ -84,7 +84,7 @@ jobs:
       with: 
         repository: portworx/action-build-changelog
         ref: v1
-        path: action-build-changelog
+        path: ./action-build-changelog
 
     - name: Generate release changelog
       id: changelog
