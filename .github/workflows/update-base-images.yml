@@ -91,7 +91,7 @@ jobs:
 
     - name: Generate release changelog
       id: changelog
-      uses: ./action-build-changelog/action.yml
+      uses: ./action-build-changelog
       with:
         repository: ${{ inputs.base_repo }}
         branch: ${{ inputs.base_branch }}
